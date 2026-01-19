@@ -1,4 +1,4 @@
-# Diccionario de Datos — Luminara (Fase 1)
+# Diccionario de Datos — Luminara 
 
 ## Visión general
 Luminara separa la persistencia en dos esquemas:
