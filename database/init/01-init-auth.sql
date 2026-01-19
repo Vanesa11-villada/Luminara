@@ -18,6 +18,9 @@ CREATE TABLE usuario (
   activo         BOOLEAN NOT NULL DEFAULT TRUE,
   creado_en      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    last_login_at   DATETIME NULL,
+  inactivated_at  DATETIME NULL,
+  inactivated_reason VARCHAR(80) NULL,
   UNIQUE KEY uq_usuario_email (email),
   CONSTRAINT fk_usuario_rol FOREIGN KEY (rol_id) REFERENCES rol(id)
     ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -39,6 +42,40 @@ CREATE TABLE usuario_direccion (
     ON UPDATE CASCADE ON DELETE CASCADE,
   INDEX idx_ud_usuario (usuario_id, es_predeterminada)
 ) ENGINE=InnoDB;
+
+-- ============================================================================
+-- TOKENS DE SESIÓN (REFRESH) - para renovar access tokens sin re-login
+-- ============================================================================
+CREATE TABLE refresh_token (
+  id         BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  usuario_id BIGINT UNSIGNED NOT NULL,
+  token_hash CHAR(64) NOT NULL, -- SHA-256 en hex
+  expires_at DATETIME NOT NULL,
+  revoked_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_refresh_user FOREIGN KEY (usuario_id) REFERENCES usuario(id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  UNIQUE KEY uq_refresh_token_hash (token_hash),
+  INDEX idx_refresh_user (usuario_id),
+  INDEX idx_refresh_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TOKENS DE RESET PASSWORD - un solo uso, expiración corta
+-- ============================================================================
+CREATE TABLE password_reset_token (
+  id         BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  usuario_id BIGINT UNSIGNED NOT NULL,
+  token_hash CHAR(64) NOT NULL, -- SHA-256 en hex
+  expires_at DATETIME NOT NULL,
+  used_at    DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_reset_user FOREIGN KEY (usuario_id) REFERENCES usuario(id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  UNIQUE KEY uq_reset_token_hash (token_hash),
+  INDEX idx_reset_user (usuario_id),
+  INDEX idx_reset_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =========================================================
 -- SEMILLAS (AUTH)
