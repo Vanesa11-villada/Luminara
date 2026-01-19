@@ -1,48 +1,81 @@
-# Diccionario de Datos — Luminara
+# Diccionario de Datos — Luminara (Fase 1)
 
-## Esquemas
+## Visión general
+Luminara separa la persistencia en dos esquemas:
+- **db_auth**: identidad y seguridad (servicio Go)
+- **db_core**: negocio y operación (servicio Java)
 
-### db_auth (Go / Auth)
-Contiene identidad y seguridad.
-Tablas:
-- rol
-- usuario
-- usuario_direccion
+No existen claves foráneas entre esquemas. La relación usuario–pedido se garantiza en Core mediante la proyección **usuario_snapshot**.
 
-**Source of truth del usuario**.
+---
 
-### db_core (Java / Core)
-Contiene negocio y operación.
-Incluye:
-- catálogo (aroma, forma, tamano)
-- producto, producto_imagen
-- insumo, proveedor, inventario_mov, insumo_proveedor
-- receta, receta_item
-- pedido, pedido_item, pedido_reserva_insumo
-- factura, factura_item
-- fidelizacion_cuenta, fidelizacion_mov
-- anuncio
-- vistas, triggers, procedimientos
+## Esquema: db_auth (Auth / Go)
 
-## Relación Usuario ↔ Pedido (Trazabilidad)
+### rol
+Catálogo de roles del sistema.
+- **PK:** id
+- **Único:** nombre
 
-- db_auth.usuario.id = identificador global del usuario.
-- db_core.usuario_snapshot.usuario_id = proyección local para operar.
-- db_core.pedido.usuario_id referencia a usuario_snapshot.
+Relación:
+- `usuario.rol_id -> rol.id`
 
-### Diagrama lógico
+### usuario
+Fuente de verdad del usuario (incluye credenciales).
+- **PK:** id
+- **Único:** email
+- Campos clave: nombre, apellido, email, password_hash, rol_id, activo
 
-db_auth.usuario (source of truth)
-        |
-        | (sincronización / snapshot)
-        v
-db_core.usuario_snapshot
-        |
-        v
-db_core.pedido
+Relaciones:
+- `usuario.rol_id -> rol.id`
+- `usuario_direccion.usuario_id -> usuario.id`
 
-## Regla de arquitectura
+### usuario_direccion
+Direcciones del usuario (envíos).
+- **PK:** id
+- **FK:** usuario_id -> usuario.id
 
-- No hay FK entre db_auth y db_core.
-- Core no contiene credenciales.
-- Core opera sin depender runtime de Auth.
+---
+
+## Esquema: db_core (Core / Java)
+
+### usuario_snapshot
+Proyección local del usuario necesaria para operar sin dependencia runtime de Auth.
+- **PK:** usuario_id
+- **Único:** email (opcional según implementación)
+- Campos clave: nombre, email, rol_id, activo, ciudad/país, actualizado_en
+
+Origen:
+- Sincronizado desde `db_auth.usuario` (en init) y en fases futuras por eventos/endpoint interno.
+
+### pedido
+Representa el ciclo de vida del pedido.
+- **PK:** id
+- **Único:** numero
+- **FK local:** `pedido.usuario_id -> usuario_snapshot.usuario_id` (si no es invitado)
+
+Regla:
+- En Core no existe FK hacia `db_auth.usuario`. La trazabilidad se mantiene por snapshot.
+
+---
+
+## Relación lógica Usuario ↔ Pedido (Trazabilidad)
+
+**Source of truth:**
+- `db_auth.usuario.id` es el identificador global del usuario.
+
+**Proyección en Core:**
+- `db_core.usuario_snapshot.usuario_id` replica el mismo id.
+
+**Uso en negocio:**
+- `db_core.pedido.usuario_id` referencia `usuario_snapshot`.
+
+Flujo conceptual:
+db_auth.usuario  → (sincronización) →  db_core.usuario_snapshot  →  db_core.pedido
+
+---
+
+## Decisión arquitectónica
+Se usa `usuario_snapshot` para:
+- evitar FK cross-schema (no soportadas)
+- evitar dependencia runtime de Auth
+- mantener integridad y reportes en Core
