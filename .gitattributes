@@ -1,0 +1,10 @@
+# Mantener finales de línea consistentes en el repositorio
+* text=auto
+
+# Archivos Go: forzar LF en el repositorio
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+
+# Scripts (si los usas)
+*.sh text eol=lf
