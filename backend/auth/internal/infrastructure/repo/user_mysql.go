@@ -19,17 +19,20 @@ func NewUserMySQLRepository(db *sql.DB) *UserMySQLRepository {
 
 func (r *UserMySQLRepository) Create(ctx context.Context, u domain.User) (uint64, error) {
 	q := `
-		INSERT INTO usuario (nombre, apellido, email, password_hash, rol_id, activo)
-		VALUES (?, ?, ?, ?, ?, ?)
+	INSERT INTO usuario (nombre, apellido, email, documento_tipo, documento_numero, password_hash, rol_id, activo)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	res, err := r.db.ExecContext(ctx, q,
 		u.Nombre,
 		u.Apellido,
 		u.Email,
+		u.DocumentoTipo,
+		u.DocumentoNumero,
 		u.PasswordHash,
 		u.RolID,
 		u.Activo,
 	)
+
 	if err != nil {
 		return 0, err
 	}

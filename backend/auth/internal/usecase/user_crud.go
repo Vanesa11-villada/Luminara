@@ -14,10 +14,13 @@ import (
 )
 
 var (
-	ErrEmailInvalido   = errors.New("email inválido")
-	ErrPasswordInvalida = errors.New("password inválida")
-	ErrUsuarioNoExiste = errors.New("usuario no existe")
+	ErrEmailInvalido     = errors.New("email inválido")
+	ErrPasswordInvalida  = errors.New("password inválida")
+	ErrUsuarioNoExiste   = errors.New("usuario no existe")
+
+	ErrDocumentoInvalido = errors.New("documento inválido")
 )
+
 
 type UserCRUD struct {
 	repo ports.UserRepository
@@ -33,6 +36,9 @@ type CreateUserInput struct {
 	Email    string
 	Password string
 	RolID    uint8
+	DocumentoTipo   string
+	DocumentoNumero string
+
 }
 
 func (uc *UserCRUD) Create(ctx context.Context, in CreateUserInput) (uint64, error) {
@@ -43,6 +49,19 @@ func (uc *UserCRUD) Create(ctx context.Context, in CreateUserInput) (uint64, err
 	if len(in.Password) < 8 {
 		return 0, ErrPasswordInvalida
 	}
+
+	// ---- Validaciones de documento (LO QUE PEDISTE) ----
+	docTipo := normalizeDocTipo(in.DocumentoTipo)          // default CC si viene vacío
+	docNumero := normalizeDocNumero(in.DocumentoNumero)    // trim y limpieza básica
+
+	if !isAllowedDocTipo(docTipo) {
+		return 0, ErrDocumentoInvalido
+	}
+	if docNumero == "" || !isValidDocNumero(docNumero) { // no vacío + formato
+		return 0, ErrDocumentoInvalido
+	}
+	// ----------------------------------------------------
+
 	if in.RolID == 0 {
 		in.RolID = 1 // Cliente por defecto
 	}
@@ -53,12 +72,14 @@ func (uc *UserCRUD) Create(ctx context.Context, in CreateUserInput) (uint64, err
 	}
 
 	u := domain.User{
-		Nombre:       strings.TrimSpace(in.Nombre),
-		Apellido:     sql.NullString{String: strings.TrimSpace(in.Apellido), Valid: strings.TrimSpace(in.Apellido) != ""},
-		Email:        email,
-		PasswordHash: string(hash),
-		RolID:        in.RolID,
-		Activo:       true,
+		Nombre:           strings.TrimSpace(in.Nombre),
+		Apellido:         sql.NullString{String: strings.TrimSpace(in.Apellido), Valid: strings.TrimSpace(in.Apellido) != ""},
+		Email:            email,
+		DocumentoTipo:    docTipo,
+		DocumentoNumero:  docNumero,
+		PasswordHash:     string(hash),
+		RolID:            in.RolID,
+		Activo:           true,
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
@@ -146,4 +167,45 @@ func (uc *UserCRUD) Deactivate(ctx context.Context, id uint64, reason string) er
 	}
 
 	return uc.repo.Deactivate(ctx, id, reason)
+}
+
+func normalizeDocTipo(s string) string {
+	s = strings.TrimSpace(strings.ToUpper(s))
+	if s == "" {
+		return "CC"
+	}
+	return s
+}
+
+func normalizeDocNumero(s string) string {
+	// Permite números y letras (por PAS, NIT con sufijos, etc.).
+	// Remueve espacios y guiones.
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ReplaceAll(s, "-", "")
+	return s
+}
+
+func isAllowedDocTipo(t string) bool {
+	switch t {
+	case "CC", "TI", "CE", "NIT", "PAS":
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidDocNumero(n string) bool {
+	// Mínimo 5 para evitar basura, máximo 20 como tu DB
+	if len(n) < 5 || len(n) > 20 {
+		return false
+	}
+	// Solo letras/números
+	for _, ch := range n {
+		if (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
+			continue
+		}
+		return false
+	}
+	return true
 }
