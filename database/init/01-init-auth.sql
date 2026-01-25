@@ -9,28 +9,31 @@ CREATE TABLE rol (
 ) ENGINE=InnoDB;
 
 CREATE TABLE usuario (
-  id             BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-  nombre         VARCHAR(120) NOT NULL,
-  apellido       VARCHAR(120),
-  email          VARCHAR(160) NOT NULL,
-  documento_tipo   ENUM('CC','TI','CE','NIT','PAS') NOT NULL DEFAULT 'CC',
-  documento_numero VARCHAR(20) NOT NULL,
-  UNIQUE KEY uq_usuario_documento (documento_tipo, documento_numero),
-  password_hash  VARCHAR(255) NOT NULL,
-  rol_id         TINYINT UNSIGNED NOT NULL,
-  activo         BOOLEAN NOT NULL DEFAULT TRUE,
-  creado_en      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  last_login_at   DATETIME NULL,
-  inactivated_at  DATETIME NULL,
+  id                BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  nombre            VARCHAR(120) NOT NULL,
+  apellido          VARCHAR(120),
+  email             VARCHAR(160) NOT NULL,
+  documento_tipo    ENUM('CC','TI','CE','NIT','PAS') NOT NULL DEFAULT 'CC',
+  documento_numero  VARCHAR(20) NOT NULL,
+  password_hash     VARCHAR(255) NOT NULL,
+  rol_id            TINYINT UNSIGNED NOT NULL,
+  activo            BOOLEAN NOT NULL DEFAULT TRUE,
+  creado_en         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  last_login_at     DATETIME NULL,
+  inactivated_at    DATETIME NULL,
   inactivated_reason VARCHAR(80) NULL,
+
   UNIQUE KEY uq_usuario_email (email),
   UNIQUE KEY uq_usuario_documento (documento_tipo, documento_numero),
+
   CONSTRAINT fk_usuario_rol FOREIGN KEY (rol_id) REFERENCES rol(id)
     ON UPDATE CASCADE ON DELETE RESTRICT,
+
   INDEX idx_usuario_activo (activo),
   INDEX idx_usuario_rol_activo (rol_id, activo)
 ) ENGINE=InnoDB;
+
 
 CREATE TABLE usuario_direccion (
   id                BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
@@ -84,8 +87,33 @@ CREATE TABLE password_reset_token (
 -- =========================================================
 -- SEMILLAS (AUTH)
 -- =========================================================
+-- =========================================================
+-- SEMILLAS (AUTH)
+-- =========================================================
 START TRANSACTION;
 
+-- Roles base
+INSERT INTO rol (id, nombre) VALUES
+ (1,'Cliente'), (2,'Trabajador'), (3,'Administrador')
+ON DUPLICATE KEY UPDATE nombre=VALUES(nombre);
+
+-- Usuarios demo (hash de ejemplo: NO usar en producción)
+-- Nota: documento_numero se asume único por (documento_tipo, documento_numero)
+INSERT INTO usuario (nombre, apellido, email, documento_tipo, documento_numero, password_hash, rol_id, activo)
+VALUES
+ ('Juan','Pérez','juan.perez@correo.com','CC','1035123456','$2a$10$abcdefghijklmnopqrstuv',1,TRUE),
+ ('María','Gómez','maria.gomez@correo.com','CC','1017123456','$2a$10$abcdefghijklmnopqrstuv',1,TRUE),
+ ('Andrés','Londoño','andres.londono@correo.com','CC','1000123456','$2a$10$abcdefghijklmnopqrstuv',2,TRUE),
+ ('Valentina','Arango','valentina.arango@correo.com','CC','1098123456','$2a$10$abcdefghijklmnopqrstuv',1,TRUE),
+ ('Camila','Restrepo','camila.restrepo@correo.com','CC','1022123456','$2a$10$abcdefghijklmnopqrstuv',2,TRUE),
+ ('Admin','Root','admin@correo.com','CC','1031123456','$2a$10$abcdefghijklmnopqrstuv',3,TRUE)
+ON DUPLICATE KEY UPDATE
+  nombre=VALUES(nombre),
+  apellido=VALUES(apellido),
+  rol_id=VALUES(rol_id),
+  activo=VALUES(activo);
+
+-- Direcciones (mínimo 1 por persona) usando documento (tipo+número)
 INSERT INTO usuario_direccion (usuario_id, etiqueta, direccion, ciudad, region, pais, telefono, es_predeterminada)
 SELECT id, 'casa',
        'Cra 70 # 44-20 (Barrio: Laureles - Estadio)',
@@ -116,7 +144,7 @@ SELECT id, 'casa',
        'Medellín','Antioquia','Colombia','3112223344', TRUE
 FROM usuario
 WHERE documento_tipo='CC' AND documento_numero='1098123456'
-ON DUPLICATE KEY UPDATE direccion=VALUES(direccion), ciudad=VALUES(ciudad), region=VALUES(region), pais=VALUES(pais), telefono=VALUES(telefono), es_predeterminada=VALUES(es_predeterminada);
+ON DUPLICATE KEY UPDATE direccion=VALUES(direccion), ciudad=VALUES(ciudad), region=VALUES(region), pais=VALUES(pais), telefono=VALUES(pais), es_predeterminada=VALUES(es_predeterminada);
 
 INSERT INTO usuario_direccion (usuario_id, etiqueta, direccion, ciudad, region, pais, telefono, es_predeterminada)
 SELECT id, 'trabajo',
@@ -135,5 +163,6 @@ WHERE documento_tipo='CC' AND documento_numero='1031123456'
 ON DUPLICATE KEY UPDATE direccion=VALUES(direccion), ciudad=VALUES(ciudad), region=VALUES(region), pais=VALUES(pais), telefono=VALUES(telefono), es_predeterminada=VALUES(es_predeterminada);
 
 COMMIT;
+
 
 -- Función: Auth queda como fuente de verdad del usuario (incluye password_hash).
