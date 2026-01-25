@@ -6,13 +6,16 @@ import (
 )
 
 type User struct {
-	ID            uint64
-	Nombre        string
-	Apellido      sql.NullString
-	Email         string
-	PasswordHash  string
-	RolID         uint8
-	Activo        bool
-	CreadoEn      time.Time
-	ActualizadoEn time.Time
+	ID               uint64
+	Nombre           string
+	Apellido         sql.NullString
+	Email            string
+	PasswordHash     string
+	RolID            uint8
+	Activo           bool
+	CreadoEn         time.Time
+	ActualizadoEn    time.Time
+	LastLoginAt      sql.NullTime
+	InactivatedAt    sql.NullTime
+	InactivatedReason sql.NullString
 }

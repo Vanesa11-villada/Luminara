@@ -2,12 +2,12 @@ package main
 
 import (
 	"log"
-	"net/http"
-
-	"github.com/gin-gonic/gin"
 
 	"github.com/Vanesa11-villada/Luminara/backend/auth/config"
+	httpDelivery "github.com/Vanesa11-villada/Luminara/backend/auth/internal/delivery/http"
 	"github.com/Vanesa11-villada/Luminara/backend/auth/internal/infrastructure/db"
+	"github.com/Vanesa11-villada/Luminara/backend/auth/internal/infrastructure/repo"
+	"github.com/Vanesa11-villada/Luminara/backend/auth/internal/usecase"
 )
 
 func main() {
@@ -17,26 +17,23 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error conectando a MySQL: %v", err)
 	}
-	defer func() {
-		_ = mysqlConn.Close()
-	}()
+	defer func() { _ = mysqlConn.Close() }()
 
 	log.Println("✅ Conexión a MySQL OK (db_auth)")
 
-	// Endpoints mínimos solo para confirmar vida del servicio
-	r := gin.Default()
+	// 1) Repositorios (infra)
+	userRepo := repo.NewUserMySQLRepository(mysqlConn.DB)
 
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	})
+	// 2) Casos de uso (aplicación)
+	userUC := usecase.NewUserCRUD(userRepo)
 
-	r.GET("/ready", func(c *gin.Context) {
-		// Ready = DB responde
-		if err := mysqlConn.DB.Ping(); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not-ready", "db": "down"})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"status": "ready", "db": "up"})
+	// 3) Handlers (delivery)
+	userHandler := httpDelivery.NewUserHandler(userUC)
+
+	// 4) Router (HTTP)
+	r := httpDelivery.NewRouter(httpDelivery.Deps{
+		UserHandler: userHandler,
+		DBPing:      mysqlConn.DB.Ping,
 	})
 
 	log.Printf("Auth service escuchando en :%s\n", cfg.AppPort)
