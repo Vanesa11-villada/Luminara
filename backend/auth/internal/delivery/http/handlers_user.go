@@ -18,12 +18,15 @@ func NewUserHandler(uc *usecase.UserCRUD) *UserHandler {
 }
 
 type createUserRequest struct {
-	Nombre   string `json:"nombre"`
-	Apellido string `json:"apellido"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	RolID    uint8  `json:"rol_id"`
+	Nombre          string `json:"nombre"`
+	Apellido        string `json:"apellido"`
+	Email           string `json:"email"`
+	DocumentoTipo   string `json:"documento_tipo"`
+	DocumentoNumero string `json:"documento_numero"`
+	Password        string `json:"password"`
+	RolID           uint8  `json:"rol_id"`
 }
+
 
 func (h *UserHandler) Create(c *gin.Context) {
 	var req createUserRequest
@@ -33,11 +36,13 @@ func (h *UserHandler) Create(c *gin.Context) {
 	}
 
 	id, err := h.uc.Create(c.Request.Context(), usecase.CreateUserInput{
-		Nombre:   req.Nombre,
-		Apellido: req.Apellido,
-		Email:    req.Email,
-		Password: req.Password,
-		RolID:    req.RolID,
+		Nombre:          req.Nombre,
+		Apellido:        req.Apellido,
+		Email:           req.Email,
+		DocumentoTipo:   req.DocumentoTipo,
+		DocumentoNumero: req.DocumentoNumero,
+		Password:        req.Password,
+		RolID:           req.RolID,
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

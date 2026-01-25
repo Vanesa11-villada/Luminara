@@ -10,6 +10,8 @@ type User struct {
 	Nombre           string
 	Apellido         sql.NullString
 	Email            string
+	DocumentoTipo   string
+	DocumentoNumero string
 	PasswordHash     string
 	RolID            uint8
 	Activo           bool
